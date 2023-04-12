@@ -85,9 +85,11 @@
 #ifdef ESP32
 #include <WiFi.h>
 #include <AsyncTCP.h>
+#include <esp_random.h>
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
+#include <ESP8266TrueRandom.h>
 #endif
 
 
@@ -149,6 +151,8 @@ static bool qr_code_scale{false};
 
 static AsyncWebServer server(80);
 
+static char password[64] = "PassWord348";
+
 static const char index_html[] PROGMEM =
     "<!DOCTYPE HTML>"
     "<html lang=\"en\">"
@@ -168,46 +172,46 @@ static const char index_html[] PROGMEM =
     // Alphanumeric only is upper case, numbers, space and '$%*+-./:',
     // which implies an *upper case* URL could fit in smaller codes.
     "    switch(version) {\n"
-    "    case 1: ecc_sizes = [[1, 25, 17], [34, 20, 14], [27, 16, 11], [17, 10, 7]]; break;\n"
-    "    case 2: ecc_sizes = [[7, 47, 32], [63, 38, 26], [48, 29, 20], [34, 20, 14]]; break;\n"
-    "    case 3: ecc_sizes = [[7, 77, 53], [101, 61, 42], [77, 47, 32], [58, 35, 24]]; break;\n"
-    "    case 4: ecc_sizes = [[7, 114, 78], [149, 90, 62], [111, 67, 46], [82, 50, 34]]; break;\n"
-    "    case 5: ecc_sizes = [[5, 154, 106], [202, 122, 84], [144, 87, 60], [106, 64, 44]]; break;\n"
-    "    case 6: ecc_sizes = [[2, 195, 134], [255, 154, 106], [178, 108, 74], [139, 84, 58]]; break;\n"
-    "    case 7: ecc_sizes = [[0, 224, 154], [293, 178, 122], [207, 125, 86], [154, 93, 64]]; break;\n"
-    "    case 8: ecc_sizes = [[1, 279, 192], [365, 221, 152], [259, 157, 108], [202, 122, 84]]; break;\n"
-    "    case 9: ecc_sizes = [[2, 335, 230], [432, 262, 180], [312, 189, 130], [235, 143, 98]]; break;\n"
-    "    case 10: ecc_sizes = [[2, 395, 271], [513, 311, 213], [364, 221, 151], [288, 174, 119]]; break;\n"
-    "    case 11: ecc_sizes = [[2, 468, 321], [604, 366, 251], [427, 259, 177], [331, 200, 137]]; break;\n"
-    "    case 12: ecc_sizes = [[3, 535, 367], [691, 419, 287], [489, 296, 203], [374, 227, 155]]; break;\n"
-    "    case 13: ecc_sizes = [[2, 619, 425], [796, 483, 331], [580, 352, 241], [427, 259, 177]]; break;\n"
-    "    case 14: ecc_sizes = [[1, 667, 458], [871, 528, 362], [621, 376, 258], [468, 283, 194]]; break;\n"
-    "    case 15: ecc_sizes = [[0, 758, 520], [991, 600, 412], [703, 426, 292], [530, 321, 220]]; break;\n"
-    "    case 16: ecc_sizes = [[8, 854, 586], [1082, 656, 450], [775, 470, 322], [602, 365, 250]]; break;\n"
-    "    case 17: ecc_sizes = [[8, 938, 644], [1212, 734, 504], [876, 531, 364], [674, 408, 280]]; break;\n"
-    "    case 18: ecc_sizes = [[5, 1046, 718], [1346, 816, 560], [948, 574, 394], [746, 452, 310]]; break;\n"
-    "    case 19: ecc_sizes = [[3, 1153, 792], [1500, 909, 624], [1063, 644, 442], [813, 493, 338]]; break;\n"
-    "    case 20: ecc_sizes = [[1, 1249, 858], [1600, 970, 666], [1159, 702, 482], [919, 557, 382]]; break;\n"
-    "    case 21: ecc_sizes = [[2, 1352, 929], [1708, 1035, 711], [1224, 742, 509], [969, 587, 403]]; break;\n"
-    "    case 22: ecc_sizes = [[9, 1460, 1003], [1872, 1134, 779], [1358, 823, 565], [1056, 640, 439]]; break;\n"
-    "    case 23: ecc_sizes = [[0, 1588, 1091], [2059, 1248, 857], [1468, 890, 611], [1108, 672, 461]]; break;\n"
-    "    case 24: ecc_sizes = [[2, 1704, 1171], [2188, 1326, 911], [1588, 963, 661], [1228, 744, 511]]; break;\n"
-    "    case 25: ecc_sizes = [[7, 1853, 1273], [2395, 1451, 997], [1718, 1041, 715], [1286, 779, 535]]; break;\n"
-    "    case 26: ecc_sizes = [[3, 1990, 1367], [2544, 1542, 1059], [1804, 1094, 751], [1425, 864, 593]]; break;\n"
-    "    case 27: ecc_sizes = [[7, 2132, 1465], [2701, 1637, 1125], [1933, 1172, 805], [1501, 910, 625]]; break;\n"
-    "    case 28: ecc_sizes = [[9, 2223, 1528], [2857, 1732, 1190], [2085, 1263, 868], [1581, 958, 658]]; break;\n"
-    "    case 29: ecc_sizes = [[9, 2369, 1628], [3035, 1839, 1264], [2181, 1322, 908], [1677, 1016, 698]]; break;\n"
-    "    case 30: ecc_sizes = [[8, 2520, 1732], [3289, 1994, 1370], [2358, 1429, 982], [1782, 1080, 742]]; break;\n"
-    "    case 31: ecc_sizes = [[7, 2677, 1840], [3486, 2113, 1452], [2473, 1499, 1030], [1897, 1150, 790]]; break;\n"
-    "    case 32: ecc_sizes = [[6, 2840, 1952], [3693, 2238, 1538], [2670, 1618, 1112], [2022, 1226, 842]]; break;\n"
-    "    case 33: ecc_sizes = [[5, 3009, 2068], [3909, 2369, 1628], [2805, 1700, 1168], [2157, 1307, 898]]; break;\n"
-    "    case 34: ecc_sizes = [[3, 3183, 2188], [4134, 2506, 1722], [2949, 1787, 1228], [2301, 1394, 958]]; break;\n"
-    "    case 35: ecc_sizes = [[9, 3351, 2303], [4343, 2632, 1809], [3081, 1867, 1283], [2361, 1431, 983]]; break;\n"
-    "    case 36: ecc_sizes = [[6, 3537, 2431], [4588, 2780, 1911], [3244, 1966, 1351], [2524, 1530, 1051]]; break;\n"
-    "    case 37: ecc_sizes = [[3, 3729, 2563], [4775, 2894, 1989], [3417, 2071, 1423], [2625, 1591, 1093]]; break;\n"
-    "    case 38: ecc_sizes = [[9, 3927, 2699], [5039, 3054, 2099], [3599, 2181, 1499], [2735, 1658, 1139]]; break;\n"
-    "    case 39: ecc_sizes = [[3, 4087, 2809], [5313, 3220, 2213], [3791, 2298, 1579], [2927, 1774, 1219]]; break;\n"
-    "    case 40: ecc_sizes = [[9, 4296, 2953], [5596, 3391, 2331], [3993, 2420, 1663], [3057, 1852, 1273]]; break;\n"
+    "    case 1: ecc_sizes = [[41, 25, 17], [34, 20, 14], [27, 16, 11], [17, 10, 7]]; break;\n"
+    "    case 2: ecc_sizes = [[77, 47, 32], [63, 38, 26], [48, 29, 20], [34, 20, 14]]; break;\n"
+    "    case 3: ecc_sizes = [[127, 77, 53], [101, 61, 42], [77, 47, 32], [58, 35, 24]]; break;\n"
+    "    case 4: ecc_sizes = [[187, 114, 78], [149, 90, 62], [111, 67, 46], [82, 50, 34]]; break;\n"
+    "    case 5: ecc_sizes = [[2555, 154, 106], [202, 122, 84], [144, 87, 60], [106, 64, 44]]; break;\n"
+    "    case 6: ecc_sizes = [[322, 195, 134], [255, 154, 106], [178, 108, 74], [139, 84, 58]]; break;\n"
+    "    case 7: ecc_sizes = [[370, 224, 154], [293, 178, 122], [207, 125, 86], [154, 93, 64]]; break;\n"
+    "    case 8: ecc_sizes = [[461, 279, 192], [365, 221, 152], [259, 157, 108], [202, 122, 84]]; break;\n"
+    "    case 9: ecc_sizes = [[552, 335, 230], [432, 262, 180], [312, 189, 130], [235, 143, 98]]; break;\n"
+    "    case 10: ecc_sizes = [[652, 395, 271], [513, 311, 213], [364, 221, 151], [288, 174, 119]]; break;\n"
+    "    case 11: ecc_sizes = [[772, 468, 321], [604, 366, 251], [427, 259, 177], [331, 200, 137]]; break;\n"
+    "    case 12: ecc_sizes = [[883, 535, 367], [691, 419, 287], [489, 296, 203], [374, 227, 155]]; break;\n"
+    "    case 13: ecc_sizes = [[1022, 619, 425], [796, 483, 331], [580, 352, 241], [427, 259, 177]]; break;\n"
+    "    case 14: ecc_sizes = [[1101, 667, 458], [871, 528, 362], [621, 376, 258], [468, 283, 194]]; break;\n"
+    "    case 15: ecc_sizes = [[1250, 758, 520], [991, 600, 412], [703, 426, 292], [530, 321, 220]]; break;\n"
+    "    case 16: ecc_sizes = [[1408, 854, 586], [1082, 656, 450], [775, 470, 322], [602, 365, 250]]; break;\n"
+    "    case 17: ecc_sizes = [[1548, 938, 644], [1212, 734, 504], [876, 531, 364], [674, 408, 280]]; break;\n"
+    "    case 18: ecc_sizes = [[1725, 1046, 718], [1346, 816, 560], [948, 574, 394], [746, 452, 310]]; break;\n"
+    "    case 19: ecc_sizes = [[1903, 1153, 792], [1500, 909, 624], [1063, 644, 442], [813, 493, 338]]; break;\n"
+    "    case 20: ecc_sizes = [[2061, 1249, 858], [1600, 970, 666], [1159, 702, 482], [919, 557, 382]]; break;\n"
+    "    case 21: ecc_sizes = [[2232, 1352, 929], [1708, 1035, 711], [1224, 742, 509], [969, 587, 403]]; break;\n"
+    "    case 22: ecc_sizes = [[2409, 1460, 1003], [1872, 1134, 779], [1358, 823, 565], [1056, 640, 439]]; break;\n"
+    "    case 23: ecc_sizes = [[2620, 1588, 1091], [2059, 1248, 857], [1468, 890, 611], [1108, 672, 461]]; break;\n"
+    "    case 24: ecc_sizes = [[2812, 1704, 1171], [2188, 1326, 911], [1588, 963, 661], [1228, 744, 511]]; break;\n"
+    "    case 25: ecc_sizes = [[3057, 1853, 1273], [2395, 1451, 997], [1718, 1041, 715], [1286, 779, 535]]; break;\n"
+    "    case 26: ecc_sizes = [[3283, 1990, 1367], [2544, 1542, 1059], [1804, 1094, 751], [1425, 864, 593]]; break;\n"
+    "    case 27: ecc_sizes = [[3517, 2132, 1465], [2701, 1637, 1125], [1933, 1172, 805], [1501, 910, 625]]; break;\n"
+    "    case 28: ecc_sizes = [[3669, 2223, 1528], [2857, 1732, 1190], [2085, 1263, 868], [1581, 958, 658]]; break;\n"
+    "    case 29: ecc_sizes = [[3909, 2369, 1628], [3035, 1839, 1264], [2181, 1322, 908], [1677, 1016, 698]]; break;\n"
+    "    case 30: ecc_sizes = [[4158, 2520, 1732], [3289, 1994, 1370], [2358, 1429, 982], [1782, 1080, 742]]; break;\n"
+    "    case 31: ecc_sizes = [[4417, 2677, 1840], [3486, 2113, 1452], [2473, 1499, 1030], [1897, 1150, 790]]; break;\n"
+    "    case 32: ecc_sizes = [[4686, 2840, 1952], [3693, 2238, 1538], [2670, 1618, 1112], [2022, 1226, 842]]; break;\n"
+    "    case 33: ecc_sizes = [[4965, 3009, 2068], [3909, 2369, 1628], [2805, 1700, 1168], [2157, 1307, 898]]; break;\n"
+    "    case 34: ecc_sizes = [[5253, 3183, 2188], [4134, 2506, 1722], [2949, 1787, 1228], [2301, 1394, 958]]; break;\n"
+    "    case 35: ecc_sizes = [[5529, 3351, 2303], [4343, 2632, 1809], [3081, 1867, 1283], [2361, 1431, 983]]; break;\n"
+    "    case 36: ecc_sizes = [[5836, 3537, 2431], [4588, 2780, 1911], [3244, 1966, 1351], [2524, 1530, 1051]]; break;\n"
+    "    case 37: ecc_sizes = [[6153, 3729, 2563], [4775, 2894, 1989], [3417, 2071, 1423], [2625, 1591, 1093]]; break;\n"
+    "    case 38: ecc_sizes = [[6479, 3927, 2699], [5039, 3054, 2099], [3599, 2181, 1499], [2735, 1658, 1139]]; break;\n"
+    "    case 39: ecc_sizes = [[6743, 4087, 2809], [5313, 3220, 2213], [3791, 2298, 1579], [2927, 1774, 1219]]; break;\n"
+    "    case 40: ecc_sizes = [[7089, 4296, 2953], [5596, 3391, 2331], [3993, 2420, 1663], [3057, 1852, 1273]]; break;\n"
     "    }\n"
     "    _(\"size\").innerText = ecc_sizes[ecc];\n"
     "    checkSize();\n"
@@ -467,23 +471,83 @@ static void display_status_message(const char *item, Args...args)
     epd.DisplayFrame();
 }
 
+static int DrawFrameQRTextCode(const String &qr, int lines)
+{
+    Serial.println("Generating QR Frame");
+    Serial.flush();
+    QRCode frame_qrcode;
+    uint8_t version{5};
+    uint8_t qrcodeData[qrcode_getBufferSize(version)];
+    if (qrcode_initText(&frame_qrcode, qrcodeData, version, 0, qr.c_str()) != 0)
+    {
+        return 0;
+    }
+    constexpr uint16_t blockSize{3};
+    paint.SetHeight(frame_qrcode.size * blockSize);
+    paint.SetWidth(frame_qrcode.size * blockSize);
+    paint.Clear(WHITE);
+    for (uint8_t x = 0; x < frame_qrcode.size; ++x)
+    {
+        for (uint8_t y = 0; y < frame_qrcode.size; ++y)
+        {
+            auto module{qrcode_getModule(&frame_qrcode, x, y)};
+            uint16_t rect_x{x * blockSize};
+            uint16_t rect_y{y * blockSize};
+            paint.DrawFilledRectangle(rect_x, rect_y, rect_x + blockSize - 1, rect_y + blockSize - 1, module ? BLACK : WHITE);
+        }
+    }
+
+    epd.SetFrameMemory(paint.GetImage(), (epd.width - paint.GetWidth()) / 2, Font24.Height + Font16.Height * lines, paint.GetWidth(), paint.GetHeight());
+
+    return frame_qrcode.size * blockSize;
+}
+
 /**
  * @brief Display the Initialize message.
  *
- * This will be displayed if the WifiManager does not establish a connection
- * in 10 seconds.
+ * This will be displayed by the WiFi manager's AP creation callback.
  */
-static void display_initialize_message()
+static void display_initialize_message(WiFiManager *w)
 {
-    epd.Clear();
-    display_status_message("Setup WiFi",
-        "Connect to the",
-        "WiFi network",
-        "'AutoConnectAP'",
-        "'and configure your",
-        "WiFi settings");
 
+    // Create a WiFi QR
+    Serial.println("Displaying initialize message");
+    String ssid{w->getConfigPortalSSID()};
+    epd.LDirInit();
+    epd.DisplayPartBaseWhiteImage();
+    String qr_string{"WIFI:S:"};
+    qr_string += ssid;
+    qr_string += ";T:WPA;P:";
+    qr_string += password;
+    qr_string += ";H:;;";
+    Serial.println(qr_string);
+
+    paint.SetWidth(epd.width);
+    paint.SetHeight(std::min(epd.height, epd.height - Font24.Height - 3*Font16.Height));
+    paint.Clear(WHITE);
+
+    display_status_message(0, Font24, "Setup WiFi",
+        "Connect to",
+        ssid.c_str(),
+        password);
+    epd.SetFrameMemory(paint.GetImage(), 0, 0, paint.GetWidth(), paint.GetHeight());
+    int qr_height{ DrawFrameQRTextCode(qr_string, 4) };
+    if (qr_height == 0)
+    {
+        Serial.println("QR code generation failure");
+        display_status_message("Setup WiFi",
+            "Connect to the",
+            "WiFi network",
+                ssid.c_str(),
+            "password",
+            password,
+            "and configure your",
+            "WiFi settings");
+        return;
+    }
+    epd.DisplayFrame();
 }
+
 /* Entry point ----------------------------------------------------------------*/
 void setup()
 {
@@ -492,24 +556,42 @@ void setup()
     epd.LDirInit();
     epd.Clear();
     display_status_message("Initializing");
-    static Ticker display_setup_message_timer;
-    display_setup_message_timer.once(10, display_initialize_message);
+
     WiFiManager wifiManager;
-    //reset saved settings
-    //wifiManager.resetSettings();
 
-    //set custom ip for portal
-    //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+    wifiManager.setAPCallback(display_initialize_message);
 
+    // Generate a random SSID and password.
+    static char ssid[64];
+    strcpy(ssid, "ImageLoad");
+    for (int i = 0; i < 3; ++i)
+    {
+#ifdef ESP8266
+        ssid[i + 9] = ESP8266TrueRandom.random('0','9');
+#elif defined(ESP32)
+        ssid[i + 9] = esp_random() % 10 + '0';
+#endif
+    }
+
+    ssid[3 + 9] = '\0';
+    for (int i = 0; i < 8; ++i)
+    {
+#ifdef ESP8266
+        password[i] = ESP8266TrueRandom.random('0', '9');
+#elif defined(ESP32)
+        password[i] = esp_random() % 10 + '0';
+#endif
+    }
+    password[8] = '\0';
+
+    Serial.println("Going to autoconnect, no-connnect AP SSID=" + String(ssid) + " password=" + String(password));
+    Serial.flush();
     //fetches ssid and pass from eeprom and tries to connect
     //if it does not connect it starts an access point with the specified name
     //here  "AutoConnectAP"
     //and goes into a blocking loop awaiting configuration
-    wifiManager.autoConnect("AutoConnectAP");
-    //or use this for auto generated name ESP + ChipID
-    //wifiManager.autoConnect();
+    wifiManager.autoConnect(ssid, password);
 
-    display_setup_message_timer.detach();
     LittleFS.begin();
 
     // Set up the web server.
@@ -623,11 +705,19 @@ void setup()
     server.begin();
 
     String myIp{ WiFi.localIP().toString() };
+
     epd.LDirInit();
     epd.DisplayPartBaseWhiteImage();
-    display_status_message("Ready",
+
+    paint.SetWidth(epd.width);
+    paint.SetHeight(Font24.Height + 2 * Font16.Height);
+    paint.Clear(WHITE);
+    display_status_message(0, Font24, "Ready",
         "Connect to http://",
         myIp.c_str());
+    epd.SetFrameMemory(paint.GetImage(), 0, 0, paint.GetWidth(), paint.GetHeight());
+    DrawFrameQRTextCode("http://"+ myIp, 3);
+    epd.DisplayFrame();
 }
 
 /* The main loop -------------------------------------------------------------*/
